@@ -1,0 +1,6 @@
+- Arduino Nano
+- MPU6050
+- Flex Sensors
+- HC-05 Bluetooth
+- DFPlayer Mini
+- Speaker
