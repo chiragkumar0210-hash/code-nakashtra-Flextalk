@@ -1,1 +1,238 @@
 
+#include <Wire.h>
+#include <MPU6050.h>
+#include "Arduino.h"
+#include "DFRobotDFPlayerMini.h"
+#include <SoftwareSerial.h>
+
+// DFPlayer and Bluetooth setup
+SoftwareSerial softSerial(11, 12); // DFPlayer: RX, TX
+SoftwareSerial btSerial(2, 3);     // Bluetooth: RX, TX
+DFRobotDFPlayerMini myDFPlayer;
+
+// MPU6050 object
+MPU6050 mpu;
+
+// Flex sensor pins
+int sensorPin1 = A6;
+int sensorPin2 = A3;
+int sensorPin3 = A2;
+int sensorPin4 = A1;
+int sensorPin5 = A0;
+
+// Sensor values
+int sensorValue1 = 0, sensorValue2 = 0, sensorValue3 = 0, sensorValue4 = 0, sensorValue5 = 0;
+
+// Gesture tracking
+int currentGesture = -1;
+int lastGesture = -1;
+bool isPlaying = false;
+unsigned long playEndTime = 0;
+
+// Tilt tracking
+String lastDirection = "";
+
+void setup() {
+  Serial.begin(115200);
+  btSerial.begin(9600);
+  softSerial.begin(9600);
+  Wire.begin();
+
+  // Flex sensors
+  pinMode(sensorPin1, INPUT);
+  pinMode(sensorPin2, INPUT);
+  pinMode(sensorPin3, INPUT);
+  pinMode(sensorPin4, INPUT);
+  pinMode(sensorPin5, INPUT);
+
+  // MPU6050 initialization
+  mpu.initialize();
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 connection failed!");
+    while (1);
+  }
+  Serial.println("MPU6050 connected!");
+
+  // DFPlayer initialization
+  Serial.println("Initializing DFPlayer...");
+  if (!myDFPlayer.begin(softSerial)) {
+    Serial.println("DFPlayer initialization failed!");
+    while (1);
+  }
+  myDFPlayer.volume(30);
+  Serial.println("DFPlayer ready.");
+}
+
+void loop() {
+  // Read flex sensor values
+  sensorValue1 = analogRead(sensorPin1);
+  sensorValue2 = analogRead(sensorPin2);
+  sensorValue3 = analogRead(sensorPin3);
+  sensorValue4 = analogRead(sensorPin4);
+  sensorValue5 = analogRead(sensorPin5);
+
+  Serial.println("=== Flex Sensor Values ===");
+  Serial.print("Thumb: "); Serial.println(sensorValue1);
+  Serial.print("Index: "); Serial.println(sensorValue2);
+  Serial.print("Middle: "); Serial.println(sensorValue3);
+  Serial.print("Lower-Mid: "); Serial.println(sensorValue4);
+  Serial.print("Pinky: "); Serial.println(sensorValue5);
+  Serial.println("==========================");
+
+  // MPU6050 Tilt Detection
+  detectDirection();
+
+  // Check if audio is done playing
+  if (isPlaying && millis() >= playEndTime) {
+    isPlaying = false;
+  }
+
+  // Check and play gesture if nothing is playing
+  if (!isPlaying) {
+    int newGesture = detectGesture();
+    if (newGesture != -1 && newGesture != lastGesture) {
+      lastGesture = newGesture;
+      playGesture(newGesture);
+    }
+  }
+
+  delay(500);
+}
+
+// Detect basic hand tilt using MPU6050 (UP, DOWN, LEFT, RIGHT)
+void detectDirection() {
+  int16_t ax, ay, az;
+  mpu.getAcceleration(&ax, &ay, &az);
+
+  if (ax > 8000) {
+    Serial.println("Up");
+   
+    lastDirection = "Up";
+  } else if (ax < -8000) {
+    Serial.println("Down");
+    
+    lastDirection = "Down";
+  } else if (ay > 8000) {
+    Serial.println("Right");
+   
+    lastDirection = "Right";
+  } else if (ay < -8000) {
+    Serial.println("Left");
+  
+    lastDirection = "Left";
+  } else {
+    lastDirection = "";
+  }
+}
+
+// Flex sensor gesture detection
+int detectGesture() {
+  if (
+    sensorValue1 > 800 && sensorValue2 > 800 && sensorValue3 > 885 &&
+    sensorValue4 > 800 && sensorValue5 > 800 &&
+    lastDirection == "Down"
+  ) {
+    return 1; // i want water
+  } else if (
+
+    sensorValue4 > 910 && sensorValue5 > 853 &&
+    lastDirection == "Up"
+  ) {
+    return 2; // Hello
+  } else if (
+ sensorValue3 > 970 &&
+    sensorValue4 > 800 && sensorValue5 > 855 &&
+    lastDirection == "Right"
+  ) {
+    return 3; // My
+  } else if (
+    sensorValue1 > 890 &&  sensorValue4 > 900 && sensorValue5 > 860 &&
+    lastDirection == "Right"
+  ) {
+    return 4; // Name is
+  } else if (
+    sensorValue1 > 850 && sensorValue2 > 920 && sensorValue3 > 965 &&
+   
+    lastDirection == "Up"
+  ) {
+    return 5; // Chirag
+  } else if (
+    sensorValue1 < 870 && sensorValue2 > 900 && sensorValue3 > 900 &&
+    sensorValue4 > 800 && sensorValue5 < 840 &&
+    lastDirection == "Right"
+  ) {
+    return 6; // And
+  } else if (
+    sensorValue1 < 880 && sensorValue2 > 900 && sensorValue3 > 900 &&
+    sensorValue4 > 800 && sensorValue5 > 850 &&
+    lastDirection == "Down"
+  ) {
+    return 7; // This
+  } else if (
+    sensorValue1 > 880 && sensorValue2 > 900 && sensorValue3 < 900 &&
+    sensorValue4 > 800 && sensorValue5 > 850 &&
+    lastDirection == "Down"
+  ) {
+    return 8; // is
+  } else if (
+    sensorValue1 < 700 && sensorValue2 > 900 && sensorValue3 > 900 &&
+    sensorValue4 > 800 && sensorValue5 > 850 &&
+    lastDirection == "Up"
+  ) {
+    return 9; // Vani
+
+  }  if (
+    sensorValue1 > 800 && sensorValue2 > 800 && sensorValue3 > 885 &&
+    sensorValue4 > 800 && sensorValue5 > 800 &&
+    lastDirection == "Left"
+  ) {
+    return 10; // Mujhe pani chahiye
+  }
+  return -1;
+}
+
+// Play audio based on gesture
+void playGesture(int gesture) {
+  switch (gesture) {
+    case 1:
+      myDFPlayer.play(9);
+      Serial.println("I want water");
+      btSerial.println("I want water");
+      playEndTime = millis() + 2000;
+      break;
+    case 2:
+      myDFPlayer.play(1);
+      Serial.println("Hello");
+      btSerial.println("Hello");
+      playEndTime = millis() + 1500;
+      break;
+    case 3:
+      myDFPlayer.play(2);
+      Serial.println("My");
+      btSerial.println("My");
+      playEndTime = millis() + 1000;
+      break;
+    case 4:
+      myDFPlayer.play(3);
+      Serial.println("Name is");
+      btSerial.println("Name is");
+      playEndTime = millis() + 2000;
+      break;
+    case 5:
+      myDFPlayer.play(4);
+      Serial.println("Chirag");
+      btSerial.println("Chirag");
+      playEndTime = millis() + 1000;
+      break;
+       case 10:
+      myDFPlayer.play(10);
+      Serial.println("Mujhe pani chahiye");
+      btSerial.println("Mujhe pani chahiye");
+      playEndTime = millis() + 1000;
+      break;
+   
+  }
+  isPlaying = true;
+}
+
+
